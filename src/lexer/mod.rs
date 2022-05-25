@@ -3,25 +3,25 @@ use crate::types::Token;
 #[derive(Debug)]
 pub struct Lexer {
     source: Vec<char>,
-    lexing_stage: LexerStage,
+    is_finished: bool,
     state: LexerState,
 }
 
 impl Lexer {
     pub fn create(source: Vec<char>) -> Lexer {
 
-        let (lexing_stage, state) = 
+        let (is_finished, state) = 
             match source.get(0) {
                 Some(first_char) => 
-                    (LexerStage::Running, LexerState { current_position: 0, current_char: *first_char }),
+                    (false, LexerState { current_position: 0, current_char: *first_char }),
                 None => 
-                    (LexerStage::End, LexerState { current_position: 0, current_char: '\0' })
+                    (true, LexerState { current_position: 0, current_char: '\0' })
             };
         
 
         Lexer {
             source,
-            lexing_stage,
+            is_finished,
             state,
         }
     }
@@ -30,9 +30,9 @@ impl Lexer {
         let mut result: Vec<Token> = Vec::new();
 
         loop {
-            match self.lexing_stage {
-                LexerStage::Running => result.push(self.get_token()),
-                LexerStage::End => return result
+            match self.is_finished {
+                false => result.push(self.get_token()),
+                true => return result
             }
         }
     }
@@ -45,7 +45,7 @@ impl Lexer {
                 let next_position = self.state.current_position + 1;
                 self.state = LexerState { current_position: next_position, current_char: *next_char };
             }
-            None => self.lexing_stage = LexerStage::End
+            None => self.is_finished = true
         }
     }
 
@@ -89,13 +89,6 @@ impl Lexer {
 
         return token
     }
-}
-
-
-#[derive(Debug)]
-enum LexerStage {
-    Running,
-    End
 }
 
 #[derive(Debug)]

@@ -54,6 +54,12 @@ impl Lexer {
         self.source.get(self.state.current_position + 1)
     }
 
+    fn skip_whitespace(&mut self) {
+        if self.state.current_char.is_whitespace() {
+            self.move_to_next_char();
+        }
+    }
+
     fn get_token(&mut self) -> Token {
         let token = match self.state.current_char {
             token_text @ '\n' => Token::Newline(String::from(token_text)),
@@ -86,6 +92,7 @@ impl Lexer {
         // After all tokenizations we stay on the last char of the parsed token,
         // we need to call this method after the tokenization to move to the next char(to parse next token)
         self.move_to_next_char();
+        self.skip_whitespace();
 
         return token
     }

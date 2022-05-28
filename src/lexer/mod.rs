@@ -1,3 +1,5 @@
+use core::panic;
+
 use crate::types::Token;
 
 #[derive(Debug)]
@@ -54,29 +56,19 @@ impl Lexer {
         self.source.get(self.state.current_position + 1)
     }
 
-    fn skip_whitespace(&mut self) {
-        if self.state.current_char.is_whitespace() {
+    // Skip all whitespace characters except a new_line
+    fn move_to_next_non_whitespace_char(&mut self) {
+        // Also check if we've reached the end of the file
+        while " \t\r".contains(self.state.current_char) && !self.is_finished {
             self.move_to_next_char();
         }
     }
 
     fn get_token(&mut self) -> Token {
-        let token = match self.state.current_char {
-            token_text @ '\n' => Token::Newline(String::from(token_text)),
-            token_text @ '+' => Token::Plus(String::from(token_text)),
-            token_text @ '-' => Token::Minus(String::from(token_text)),
-            token_text @ '*' => Token::Asterisk(String::from(token_text)),
-            token_text @ '=' => Token::EQ(String::from(token_text)),
-            token_text if token_text.is_numeric() => get_number_token(self),
-            token_text => Token::InvalidToken(String::from(token_text))
-        };
-
-        // Tokenize the whole number
-        // Modifies current state of the lexer by moving to the next char while the next char is a numeric
-        // TODO: Make it work for floating point numbers
+        // Tries to get a number token, panics if can't tokenize it as a number 
+        // Modifies current state of the lexer by moving to the next char
         fn get_number_token(lexer: &mut Lexer) -> Token {
-            let mut number_string = String::from("");
-            number_string.push(lexer.state.current_char);
+            let mut number_string = String::from(lexer.state.current_char);
 
             loop {
                 match lexer.peek_next_char() {
@@ -84,15 +76,56 @@ impl Lexer {
                         lexer.move_to_next_char();
                         number_string.push(lexer.state.current_char);
                     }
-                    _ => return Token::Number(number_string)
+                    _ => return Token::Number(number_string),
                 }
             }
         }
 
+        // Tries to get a keyword token, panics if can't tokenize it as a keyword
+        // Modifies current state of the lexer by moving to the next char
+        fn get_keyword_token(lexer: &mut Lexer) -> Token {
+
+            fn keyword_token_from_string(string: &str) -> Option<Token> {
+                match string {
+                    "LET" => Some(Token::Let(string.to_string())),
+                    _ => None
+                }
+            }
+
+            let mut keyword_string = String::from(lexer.state.current_char);
+
+            loop {
+                match lexer.peek_next_char() {
+                    Some(next_char) if next_char.is_alphabetic() => {
+                        lexer.move_to_next_char();
+                        keyword_string.push(lexer.state.current_char);
+                    }
+                    _ => match keyword_token_from_string(keyword_string.as_str()) {
+                        Some(keyword_token) => return keyword_token,
+                        None => panic!("Invalid KEYWORD {} !", keyword_string)
+                    }
+                }                
+            }
+        }
+
+        let token = match self.state.current_char {
+            '\n' => Token::Newline(String::from(self.state.current_char)),
+            '+' => Token::Plus(String::from(self.state.current_char)),
+            '-' => Token::Minus(String::from(self.state.current_char)),
+            '*' => Token::Asterisk(String::from(self.state.current_char)),
+            '=' => Token::EQ(String::from(self.state.current_char)),
+            c if c.is_numeric() => get_number_token(self),
+            // If it's a sequence of alphabetic chars, it should be a keyword
+            c if c.is_alphabetic() && self.peek_next_char().filter(|&c| c.is_alphabetic()).is_some() => get_keyword_token(self),
+            // If it's a single char, it should be an ident(var)
+            c if c.is_alphabetic() => Token::Var(String::from(c)),
+            _ => Token::InvalidToken(String::from(self.state.current_char))
+        };
+
         // After all tokenizations we stay on the last char of the parsed token,
         // we need to call this method after the tokenization to move to the next char(to parse next token)
         self.move_to_next_char();
-        self.skip_whitespace();
+        self.move_to_next_non_whitespace_char();
 
         return token
     }
